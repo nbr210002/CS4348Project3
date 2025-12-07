@@ -3,13 +3,12 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class BTreeNode
-{
+public class BTreeNode {
     public static final int T = 10;
-    public static final int MAX_KEYS = 2 * T-1;
-    public static final int MAX_CHILDREN = 2* T;
+    public static final int MAX_KEYS = 2 * T - 1;    // 19
+    public static final int MAX_CHILDREN = 2 * T;    // 20
+    public static final int BLOCK_BYTES = 512;
 
-    // Nodes
     private long blockID;
     private long parentID;
     private int numKeys;
@@ -24,12 +23,14 @@ public class BTreeNode
         this.parentID = parentID;
         this.isLeaf = isLeaf;
         this.numKeys = 0;
+
         this.keys = new long[MAX_KEYS];
-        this.values = new long[MAX_CHILDREN];
+        this.values = new long[MAX_KEYS];
         this.children = new long[MAX_CHILDREN];
-        Arrays.fill(this.keys, 0);
-        Arrays.fill(this.values, 0);
-        Arrays.fill(this.children, 0);
+
+        Arrays.fill(this.keys, 0L);
+        Arrays.fill(this.values, 0L);
+        Arrays.fill(this.children, 0L);
     }
 
     // Getters and setters
@@ -37,83 +38,105 @@ public class BTreeNode
     {
         return blockID;
     }
+
     public long getParentID()
     {
         return parentID;
     }
-    public void  setParentID(long parentID)
+
+    public void setParentID(long parentID)
     {
         this.parentID = parentID;
     }
+
     public int getNumKeys()
     {
         return numKeys;
     }
+
+    public void setNumKeys(int n)
+    {
+        this.numKeys = n;
+    }
+
     public boolean isLeaf()
     {
         return isLeaf;
     }
 
-    // Insert key at position i
+    public long getKey(int i)
+    {
+        return keys[i];
+    }
+
+    public long getValue(int i)
+    {
+        return values[i];
+    }
+
+    public long getChild(int i)
+    {
+        return children[i];
+    }
+
+    public void setChild(int index, long childBlockId)
+    {
+        children[index] = childBlockId;
+    }
+
     public void insertKey(int i, long key, long value)
     {
-        if (numKeys >= MAX_KEYS)
-        {
-            throw new IllegalStateException("Node Is Full");
-        }
-
+        if (numKeys >= MAX_KEYS) throw new IllegalStateException("Node is full");
         for (int j = numKeys; j > i; j--)
         {
-            keys[j] = keys[j-1];
-            values[j] = values[j-1];
+            keys[j] = keys[j - 1];
+            values[j] = values[j - 1];
         }
         keys[i] = key;
         values[i] = value;
         numKeys++;
     }
 
-    // Set child pointer
-    public void setChild(int index, long childBlockInt)
+    public void clearKeysFrom(int startIndex)
     {
-        children[index] = childBlockInt;
+        for (int i = startIndex; i < MAX_KEYS; i++)
+        {
+            keys[i] = 0L;
+            values[i] = 0L;
+        }
     }
-    public long getKey(int i)
+
+    public void clearChildrenFrom(int startIndex)
     {
-        return keys[i];
-    }
-    public long getValue(int i)
-    {
-        return values[i];
-    }
-    public long getChild(int i)
-    {
-        return children[i];
+        for (int i = startIndex; i < MAX_CHILDREN; i++)
+        {
+            children[i] = 0L;
+        }
     }
 
     public byte[] toBytes()
     {
-        ByteBuffer bb = ByteBuffer.allocate(512);
+        ByteBuffer bb = ByteBuffer.allocate(BLOCK_BYTES);
+
         bb.putLong(blockID);
         bb.putLong(parentID);
-        bb.putInt(numKeys);
+        bb.putLong((long) numKeys);
 
-        for (int i = 0; i <MAX_KEYS; i++) bb.putLong(keys[i]);
+        for (int i = 0; i < MAX_KEYS; i++) bb.putLong(keys[i]);
         for (int i = 0; i < MAX_KEYS; i++) bb.putLong(values[i]);
         for (int i = 0; i < MAX_CHILDREN; i++) bb.putLong(children[i]);
 
-        // remaining unused bytes
         return bb.array();
     }
 
-    // Deserialize nodes
     public static BTreeNode fromBytes(byte[] data)
     {
         ByteBuffer bb = ByteBuffer.wrap(data);
+
         long blockID = bb.getLong();
         long parentID = bb.getLong();
-        int numKeys = (int)  bb.getLong();
+        int numKeys = (int) bb.getLong();
 
-        // Defaults to true
         BTreeNode node = new BTreeNode(blockID, parentID, true);
         node.numKeys = numKeys;
 
@@ -125,7 +148,7 @@ public class BTreeNode
         node.isLeaf = true;
         for (long c : node.children)
         {
-            if (c != 0)
+            if (c != 0L)
             {
                 node.isLeaf = false;
                 break;
@@ -134,13 +157,12 @@ public class BTreeNode
         return node;
     }
 
-    // Debug print
     public void printNode()
     {
-        System.out.print("BlockID: " + blockID + ", Keys: ");
+        System.out.print("BlockID: " + blockID + " Keys:");
         for (int i = 0; i < numKeys; i++)
         {
-            System.out.print(keys[i] + "(" + values[i] + ") ");
+            System.out.print(" " + keys[i] + "(" + values[i] + ")");
         }
         System.out.println();
     }
